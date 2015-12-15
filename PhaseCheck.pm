@@ -27,7 +27,8 @@ sub get_errors {
     }
     $self->_validate;
 
-    $self->{spots} = $self->tail_idata;
+    # $self->{spots} = $self->tail_idata;
+    $self->{spots} = $self->tail_idata_test('/home/EUR-A0-Fx.log');
     my $errors = {};
     foreach my $provider (keys %{$self->{spots}}) {
         next if $provider eq 'FXCM';
@@ -208,7 +209,51 @@ sub tail_idata {
         last if $fields[0] + $interval < $last_epoch;
         next if $fields[6] && $fields[6] =~ /BADSRC/;
         $spots->{$fields[5]} = {} if !$spots->{$fields[5]};
-        $spots->{$fields[5]}->{($fields[5] eq 'FXDD' ? $fields[0] - 10 : $fields[0])} = $fields[4];
+        $spots->{$fields[5]}->{$fields[0]} = $fields[4];
+    }
+    close $bw;
+
+    return $spots;
+}
+
+sub tail_idata_test {
+
+    use Time::Local;
+    my ($self, $params) = @_;
+
+    my $path = $params->{path};
+    if (!$path) {
+        my $date = $self->_get_current_date;
+        $path = "$self->{path}/idata/$self->{symbol}/$date-fullfeed.csv";
+    }
+
+    my $interval = $params->{interval} || $self->{long};
+    if (!(-f $path)) {
+        return {};
+    }
+
+    if (!$interval) {
+        $self->_add_error("Interval (Long) is not provided!");
+    }
+
+    $self->_validate;
+
+    open my $bw, "-|", "tail", "-r", $path;
+
+    my %spots;
+    my $last_epoch;
+    my $spots = {};
+    while (my $line = <$bw>) {
+        chomp $line;
+        my @fields = split /\,/, $line;
+
+        my ($year,$month,$day,$hours,$min,$sec) = split(/[\/: ]/,$fields[1]);
+        my $epoch = timegm($sec,$min,$hours,$day,$month,$year); 
+        $last_epoch = $epoch if !$last_epoch;
+        last if $epoch + $interval < $last_epoch;
+        # next if $fields[6] && $fields[6] =~ /BADSRC/;
+        $spots->{$fields[4]} = {} if !$spots->{$fields[4]};
+        $spots->{$fields[4]}->{$epoch} = ($fields[5]+$fields[6])/2;
     }
     close $bw;
 
