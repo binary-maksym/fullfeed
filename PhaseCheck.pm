@@ -27,9 +27,9 @@ sub get_errors {
     }
     $self->_validate;
 
-    my $data   = $self->tail_idata;
+    $self->{spots} = $self->tail_idata;
     my $errors = {};
-    foreach my $provider (keys %$data) {
+    foreach my $provider (keys %{$self->{spots}}) {
         next if $provider eq 'FXCM';
         $errors->{$provider} = $self->get_min_error({
             sample_name => $provider,
@@ -187,7 +187,7 @@ sub tail_idata {
 
     my $interval = $params->{interval} || $self->{long};
     if (!(-f $path)) {
-        $self->_add_error("Can not find fead file in \"$path\"!");
+        return {};
     }
 
     if (!$interval) {
@@ -210,7 +210,6 @@ sub tail_idata {
         $spots->{$fields[5]} = {} if !$spots->{$fields[5]};
         $spots->{$fields[5]}->{($fields[5] eq 'FXDD' ? $fields[0] - 10 : $fields[0])} = $fields[4];
     }
-    $self->setSpots($spots);
     close $bw;
 
     return $spots;
@@ -272,7 +271,10 @@ sub setSpots {
 }
 
 sub _get_current_date {
-    return '11-Nov-15';
+    my $self = shift;
+    my ($sec, $min, $hour, $day, $month, $year) = gmtime;
+    my $date = "$day-" . $self->_month_to_name($month) . "-" . ($year + 1900);
+    return $date;
 }
 
 sub _add_error {
@@ -287,6 +289,26 @@ sub _validate {
         print join("\n", @{$self->{_error}}) . "\n";
         die();
     }
+}
+
+sub _month_to_name {
+    my $self   = shift;
+    my $number = shift;
+    my %m      = (
+        0  => 'Jan',
+        1  => 'Feb',
+        2  => 'Mar',
+        3  => 'Apr',
+        4  => 'May',
+        5  => 'Jun',
+        6  => 'Jul',
+        7  => 'Aug',
+        8  => 'Sep',
+        9  => 'Oct',
+        10 => 'Nov',
+        11 => 'Dec'
+    );
+    return $m{$number};
 }
 
 1;
